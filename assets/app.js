@@ -7,6 +7,12 @@ const SOURCES={
  history:"https://bdaib-hub.pages.dev/data/winter/history.csv",
  forecast:"https://api.open-meteo.com/v1/forecast?latitude=53.99,54.04,54.07,53.88,53.92,53.87,54.06,54.11,53.83,53.9&longitude=-7.345,-7.38,-7.44,-7.33,-6.98,-7.54,-7.09,-7.58,-7.08,-6.8&hourly=temperature_2m,soil_temperature_0cm,dew_point_2m,precipitation&forecast_hours=24&timezone=Europe%2FDublin"
 };
+const LOCAL={
+ tonight:"data/live/tonight.csv",
+ routes:"data/live/routes.csv",
+ history:"data/live/history.csv",
+ forecast:"data/live/forecast.json"
+};
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const fmt=v=>Number.isFinite(Number(v))?Number(v).toFixed(1):"—";
 const pct=v=>Math.max(0,Math.min(99,Math.round(Number(v||0)*100)));
@@ -50,26 +56,23 @@ async function fetchText(url,timeoutMs=12000){
  }finally{clearTimeout(timer);}
 }
 async function fetchJson(url,timeoutMs=12000){return JSON.parse(await fetchText(url,timeoutMs));}
+async function fetchFirst(localUrl,remoteUrl,timeoutMs=12000){
+ try{return await fetchText(localUrl,timeoutMs);}catch(localError){return await fetchText(remoteUrl,timeoutMs);}
+}
+async function fetchJsonFirst(localUrl,remoteUrl,timeoutMs=12000){
+ try{return await fetchJson(localUrl,timeoutMs);}catch(localError){return await fetchJson(remoteUrl,timeoutMs);}
+}
 
 const COORDS=[
  [53.99,-7.345],[54.04,-7.38],[54.07,-7.44],[53.88,-7.33],[53.92,-6.98],
  [53.87,-7.54],[54.06,-7.09],[54.11,-7.58],[53.83,-7.08],[53.9,-6.8]
 ];
 async function loadForecast(){
- // Open-Meteo supports multi-location responses, but the public dashboard
- // uses one request per coordinate as the most reliable browser path.
- const requests=COORDS.map(([lat,lon])=>{
-   const url="https://api.open-meteo.com/v1/forecast?"+
-     "latitude="+encodeURIComponent(lat)+
-     "&longitude="+encodeURIComponent(lon)+
-     "&hourly=temperature_2m%2Csoil_temperature_0cm%2Cdew_point_2m%2Cprecipitation"+
-     "&forecast_hours=24&timezone=Europe%2FDublin";
-   return fetchJson(url,12000).then(x=>{
-     if(!x || !x.hourly || !Array.isArray(x.hourly.time)) throw new Error("Invalid Open-Meteo response");
-     return x.hourly;
-   });
- });
- return await Promise.all(requests);
+ const data=await fetchJsonFirst(LOCAL.forecast,SOURCES.forecast,15000);
+ const locations=Array.isArray(data)?data:[data];
+ const valid=locations.map(x=>x&&x.hourly?x.hourly:x).filter(x=>x&&Array.isArray(x.time));
+ if(!valid.length) throw new Error("Invalid Open-Meteo response");
+ return valid;
 }
 async function load(){
  routes=[];depots=[];history=[];forecast=[];
@@ -77,9 +80,9 @@ async function load(){
  const status=(msg)=>{const el=$("#dataStatus");if(el)el.textContent=msg;};
  status("Loading live weather…");
 
- const routeP=fetchText(SOURCES.routes).then(t=>{routes=csvParse(t);return"routes";}).catch(()=>{errors.push("routes");return"routes";});
- const depotP=fetchText(SOURCES.tonight).then(t=>{depots=csvParse(t);return"depot";}).catch(()=>{errors.push("depot");return"depot";});
- const historyP=fetchText(SOURCES.history,20000).then(t=>{history=csvParse(t);return"history";}).catch(()=>{errors.push("history");return"history";});
+ const routeP=fetchFirst(LOCAL.routes,SOURCES.routes).then(t=>{routes=csvParse(t);return"routes";}).catch(()=>{errors.push("routes");return"routes";});
+ const depotP=fetchFirst(LOCAL.tonight,SOURCES.tonight).then(t=>{depots=csvParse(t);return"depot";}).catch(()=>{errors.push("depot");return"depot";});
+ const historyP=fetchFirst(LOCAL.history,SOURCES.history,20000).then(t=>{history=csvParse(t);return"history";}).catch(()=>{errors.push("history");return"history";});
  const forecastP=loadForecast().then(f=>{
    forecast=f;
    status("Live weather connected");
