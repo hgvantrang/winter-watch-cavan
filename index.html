@@ -6,7 +6,7 @@
 <title>Winter Watch · County Cavan · Live Decision Support</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/styles.css?v=20261117b"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/styles.css?v=20261117c"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body><div class="app">
 <header class="topbar">
@@ -35,5 +35,5 @@
 <footer><div><b>WINTER WATCH</b> · County Cavan</div><div>Human final decision · Source-aware · No provider key in frontend</div><div><button id="sourceBtn">Data provenance</button></div></footer>
 </div>
 <div class="modal" id="modal" hidden><div class="modal-box"><button class="close" id="close">×</button><span class="eyebrow">PROVENANCE & MODEL GOVERNANCE</span><h2>Every number has a source.</h2><div class="prov"><div><b>Forecast</b><span>Open-Meteo · 24-hour route coordinates · retrieved in browser</span></div><div><b>Plan</b><span>County Cavan Winter Service Plan 2024 · thresholds and operational rules</span></div><div><b>History</b><span>Assignment history.csv · five winters · 7,560 route-night rows</span></div><div><b>ML</b><span>Winter Watch Logistic Regression · supporting hazard evidence only</span></div></div><div class="security"><b>Security rule</b><p>Provider credentials are not stored in HTML or frontend JavaScript. The LLM, when connected, receives a compact code-generated summary rather than the raw history file.</p></div></div></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script type="module" src="assets/app.js?v=20261117b"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script type="module" src="assets/app.js?v=20261117c"></script>
 </body></html>
