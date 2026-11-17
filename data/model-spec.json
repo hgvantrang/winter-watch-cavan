@@ -1,0 +1,45 @@
+{
+  "model": "logistic_regression",
+  "target": "ice_incidents > 0",
+  "training_rows": 7560,
+  "positive_rows": 35,
+  "validation": "GroupShuffleSplit by date, 80/20, random_state=42",
+  "validation_auc": 0.9763006326,
+  "intercept": -5.5696484750,
+  "numeric_coefficients": {
+    "min_air_c": 1.1714244552,
+    "min_ground_c": -5.6482422456,
+    "min_dewpoint_c": -0.3892016548,
+    "rain_mm": 0.2661719783,
+    "hours_ground_at_or_below_0": 0.4223293317,
+    "forecast_ground_c": 1.6176344671
+  },
+  "numeric_means": {
+    "min_air_c": 3.8033112583,
+    "min_ground_c": 4.0446688742,
+    "min_dewpoint_c": 2.5625827815,
+    "rain_mm": 1.7965231788,
+    "hours_ground_at_or_below_0": 1.1447019878,
+    "forecast_ground_c": 4.0711920530
+  },
+  "numeric_scales": {
+    "min_air_c": 3.6526927782,
+    "min_ground_c": 2.9392504884,
+    "min_dewpoint_c": 3.5172456795,
+    "rain_mm": 3.1843685628,
+    "hours_ground_at_or_below_0": 3.7922352366,
+    "forecast_ground_c": 3.0655160498
+  },
+  "route_coefficients": {
+    "R01": -2.7939898557,
+    "R02": -1.0624001093,
+    "R03": 0.1989959132,
+    "R04": -0.7299384364,
+    "R05": 1.6473900689,
+    "R06": -1.0159525339,
+    "R07": 0.4791935627,
+    "R08": 1.3699410407,
+    "R09": 0.7054879878,
+    "R10": 1.2208953727
+  }
+}
