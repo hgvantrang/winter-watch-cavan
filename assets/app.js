@@ -133,6 +133,11 @@ function render(){
  $("#routeList").innerHTML=routeRows.map(x=>'<div class="route-item"><div class="route-line"><span class="route-name">'+x.route_id+" · "+x.route+'</span><span class="decision '+x.decision+'">'+label(x.decision)+'</span></div><div class="route-meta">P'+x.priority+" · "+x.depot+" · ground "+fmt(x.forecast.soil_temperature_0cm)+"°C · "+(x.moisture?.possible?"moisture possible":"dry")+'</div><div class="riskbar"><i style="width:'+pct(x.risk)+'%"></i></div><div class="route-extra"><span>ML hazard '+pct(x.risk)+'%</span><span>'+ (x.departureAt?("leave "+time(x.departureAt)):"no departure")+'</span></div></div>').join("");
  $("#routeTable").innerHTML=routeRows.map(x=>'<tr><td>'+x.route_id+" · "+x.route+'</td><td><span class="pbadge">P"+x.priority+'</span></td><td class="'+(x.forecast.soil_temperature_0cm<=groundThresholdC(x.priority)?"temp-warn":"temp-good")+'">'+fmt(x.forecast.soil_temperature_0cm)+'°C</td><td>'+(x.moisture?.possible?"Possible":"Dry")+'</td><td><span class="risk '+(x.risk>.7?"high":x.risk>.35?"med":"low")+'">'+pct(x.risk)+'%</span></td><td><span class="decision '+x.decision+'">'+label(x.decision)+'</span></td><td>'+time(x.departureAt)+'</td></tr>').join("");
  const f=forecast[0]||{};const times=f.time||[], soil=f.soil_temperature_0cm||[];
+ $("#airTemp").textContent=fmt(f.temperature_2m?.[0])+"°C";
+ $("#groundTemp").textContent=fmt(f.soil_temperature_0cm?.[0])+"°C";
+ $("#dewTemp").textContent=fmt(f.dew_point_2m?.[0])+"°C";
+ $("#rainTemp").textContent=fmt(f.precipitation?.[0])+" mm";
+ $("#freezeWindow").textContent=hoursBelow0(soil)+" h";
  $("#forecastStrip").innerHTML=Array.from({length:8},(_,h)=>{const s=soil[h],t=times[h];return '<div class="hour '+(s<=0?"cold":s<=1.5?"warn":"")+'"><div class="t">'+(t?new Intl.DateTimeFormat("en-IE",{hour:"2-digit"}).format(new Date(t)):"+"+h+"h")+'</div><div class="temp">'+fmt(s)+'°</div><div class="soil">ground</div></div>';}).join("");
  const hs=summariseHistory(history),tot=validateHistoryChecks(history);$("#historyRows").textContent=tot.rows.toLocaleString();$("#historyRuns").textContent=tot.gritting_runs.toLocaleString();$("#historySalt").textContent=tot.salt_t.toFixed(1);
  const candidates=hs.map(x=>({x,score:(num(x.ice_incidents_untreated)-num(x.ice_incidents_treated))})).sort((a,b)=>b.score-a.score);
