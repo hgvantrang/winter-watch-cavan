@@ -1,0 +1,5 @@
+(() => {
+const clock=document.getElementById("clock"),dateChip=document.getElementById("dateChip"),modal=document.getElementById("sourceModal");
+function tick(){const now=new Date();dateChip.textContent=new Intl.DateTimeFormat("en-IE",{weekday:"long",day:"numeric",month:"long",year:"numeric",timeZone:"Europe/Dublin"}).format(now);clock.textContent=new Intl.DateTimeFormat("en-IE",{hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"Europe/Dublin",hour12:false}).format(now)+" Dublin time"}tick();setInterval(tick,1000);
+document.getElementById("sourceBtn").addEventListener("click",()=>modal.hidden=false);document.getElementById("closeModal").addEventListener("click",()=>modal.hidden=true);modal.addEventListener("click",e=>{if(e.target===modal)modal.hidden=true});document.addEventListener("keydown",e=>{if(e.key==="Escape")modal.hidden=true});
+})();
