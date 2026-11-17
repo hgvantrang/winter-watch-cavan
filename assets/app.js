@@ -134,6 +134,9 @@ function renderWeather(){
 }
 function render(){
  buildRows();
+ // Render the weather feed independently of route/depot availability.
+ // A missing route source must never blank a successfully loaded forecast.
+ renderWeather();
  const treat=routeRows.filter(x=>x.decision==="TREAT").length,flag=routeRows.filter(x=>x.decision==="FLAG").length,max=Math.max(...routeRows.map(x=>x.risk),0);
  if(!routeRows.length){
    $("#networkDecision").textContent="DATA CHECK";
@@ -142,6 +145,9 @@ function render(){
    $("#routeTable").innerHTML='<tr><td colspan="7">Route data unavailable — no operational decision issued.</td></tr>';
    $("#treatCount").textContent="—";$("#flagCount").textContent="—";$("#maxRisk").textContent="—";
    $("#signoffDecision").textContent="NO DECISION";$("#signoffRisk").textContent="—";
+   // Keep forecast/evidence visible even when route records are unavailable.
+   const hs=summariseHistory(history),tot=validateHistoryChecks(history);
+   $("#historyRows").textContent=tot.rows.toLocaleString();$("#historyRuns").textContent=tot.gritting_runs.toLocaleString();$("#historySalt").textContent=tot.salt_t.toFixed(1);
    return;
  }
  $("#treatCount").textContent=treat;$("#flagCount").textContent=flag;$("#maxRisk").textContent=pct(max)+"%";
@@ -150,7 +156,6 @@ function render(){
  $("#signoffDecision").textContent=treat?"TREATMENT REQUIRED":"MONITOR";$("#signoffRisk").textContent=pct(max)+"%";
  $("#routeList").innerHTML=routeRows.map(x=>'<div class="route-item"><div class="route-line"><span class="route-name">'+x.route_id+" · "+x.route+'</span><span class="decision '+x.decision+'">'+label(x.decision)+'</span></div><div class="route-meta">P'+x.priority+" · "+x.depot+" · ground "+fmt(x.forecast.soil_temperature_0cm)+"°C · "+(x.moisture?.possible?"moisture possible":"dry")+'</div><div class="riskbar"><i style="width:'+pct(x.risk)+'%"></i></div><div class="route-extra"><span>ML hazard '+pct(x.risk)+'%</span><span>'+ (x.departureAt?("leave "+time(x.departureAt)):"no departure")+'</span></div></div>').join("");
  $("#routeTable").innerHTML=routeRows.map(x=>'<tr><td>'+x.route_id+" · "+x.route+'</td><td><span class="pbadge">P"+x.priority+'</span></td><td class="'+(x.forecast.soil_temperature_0cm<=groundThresholdC(x.priority)?"temp-warn":"temp-good")+'">'+fmt(x.forecast.soil_temperature_0cm)+'°C</td><td>'+(x.moisture?.possible?"Possible":"Dry")+'</td><td><span class="risk '+(x.risk>.7?"high":x.risk>.35?"med":"low")+'">'+pct(x.risk)+'%</span></td><td><span class="decision '+x.decision+'">'+label(x.decision)+'</span></td><td>'+time(x.departureAt)+'</td></tr>').join("");
- renderWeather();
  const hs=summariseHistory(history),tot=validateHistoryChecks(history);$("#historyRows").textContent=tot.rows.toLocaleString();$("#historyRuns").textContent=tot.gritting_runs.toLocaleString();$("#historySalt").textContent=tot.salt_t.toFixed(1);
  const candidates=hs.map(x=>({x,score:(num(x.ice_incidents_untreated)-num(x.ice_incidents_treated))})).sort((a,b)=>b.score-a.score);
  const top=candidates[0]?.x;if(top){$("#reviewRoute").textContent=top.route_id+" · "+top.route;$("#reviewText").innerHTML='<strong>'+top.ice_incidents_untreated+'</strong> untreated-night ice incidents vs <strong>'+top.ice_incidents_treated+'</strong> treated-night incidents.';}
