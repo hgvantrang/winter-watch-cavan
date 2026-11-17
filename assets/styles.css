@@ -43,3 +43,12 @@ th{background:#f4f8f8}tr:hover td{background:#fbfdfd}
 .empty-state{margin:18px;padding:28px;border:1px dashed #cbdadd;border-radius:12px;background:#f8fbfb;text-align:center;display:grid;gap:8px;color:#6f8085}.empty-state b{font:600 14px "Space Grotesk";color:#29434b}.empty-state span{font-size:9px}.empty-icon{margin:auto;width:32px;height:32px;border-radius:50%;background:#fff3dc;color:#9b6d25;display:grid;place-items:center;font-weight:800}
 @media(max-width:1050px){.hero-art{opacity:.35;right:0}.hero-side{position:relative}.workspace,.detail-grid,.gov{grid-template-columns:1fr}}
 @media(max-width:700px){.hero{padding:34px 20px;min-height:330px}.hero-art{right:-90px;opacity:.25}.hero h1{font-size:36px}.alert,.kpis,.workspace,.detail-grid,.route-table-section,.gov{padding-left:20px;padding-right:20px}.alert{margin-left:20px;margin-right:20px}.kpis{grid-template-columns:1fr}}
+
+.weather-now{display:grid;grid-template-columns:1.35fr repeat(4,1fr);gap:10px;padding:0 22px 18px}
+.weather-main,.weather-metric{min-height:82px;border:1px solid #dce9eb;border-radius:12px;background:linear-gradient(145deg,#f8fcfc,#eef7f8);display:flex;align-items:center;padding:14px 16px}
+.weather-main{gap:13px;background:linear-gradient(135deg,#0b3641,#0f5260);border-color:transparent;color:#fff}
+.weather-icon{font-size:30px;filter:drop-shadow(0 4px 8px rgba(255,255,255,.18))}
+.weather-main b{display:block;font:700 25px "Space Grotesk"}.weather-main span:last-child{display:block;font-size:9px;color:#b9d3d7;text-transform:uppercase;letter-spacing:1px}
+.weather-metric{display:block}.weather-metric span{display:block;font:700 8px "Space Grotesk";letter-spacing:1.4px;color:#71858b}.weather-metric b{display:block;margin-top:7px;font:700 19px "Space Grotesk";color:#12343d}.weather-metric small{font-size:8px;color:#829398}
+@media(max-width:900px){.weather-now{grid-template-columns:repeat(2,1fr)}.weather-main{grid-column:1/-1}}
+@media(max-width:600px){.weather-now{grid-template-columns:1fr}}
