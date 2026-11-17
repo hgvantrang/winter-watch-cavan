@@ -114,6 +114,24 @@ function buildRows(){
    return {...decision,route_id:id,route:routeName(r,i),priority:p,depot:depotOf(r)||clean(get(d,"depot","name"))||"—",forecast:fc,hoursBelow0:below,risk:modelRisk(id,fc,below),departureAt:decision.departureAt};
  });
 }
+function renderWeather(){
+ const f=forecast[0]||{};
+ const soil=f.soil_temperature_0cm||[], times=f.time||[];
+ const set=(id,v)=>{const el=$(id);if(el)el.textContent=v;};
+ set("#airTemp",fmt(f.temperature_2m?.[0])+"°C");
+ set("#groundTemp",fmt(f.soil_temperature_0cm?.[0])+"°C");
+ set("#dewTemp",fmt(f.dew_point_2m?.[0])+"°C");
+ set("#rainTemp",fmt(f.precipitation?.[0])+" mm");
+ set("#freezeWindow",hoursBelow0(soil)+" h");
+ if(times.length){
+   set("#forecastStrip", "");
+   const strip=$("#forecastStrip");
+   if(strip) strip.innerHTML=Array.from({length:Math.min(8,times.length)},(_,h)=>{
+     const s=soil[h],t=times[h];
+     return '<div class="hour '+(s<=0?"cold":s<=1.5?"warn":"")+'"><div class="t">'+(t?new Intl.DateTimeFormat("en-IE",{hour:"2-digit"}).format(new Date(t)):"+"+h+"h")+'</div><div class="temp">'+fmt(s)+'°</div><div class="soil">ground</div></div>';
+   }).join("");
+ }
+}
 function render(){
  buildRows();
  const treat=routeRows.filter(x=>x.decision==="TREAT").length,flag=routeRows.filter(x=>x.decision==="FLAG").length,max=Math.max(...routeRows.map(x=>x.risk),0);
@@ -132,13 +150,7 @@ function render(){
  $("#signoffDecision").textContent=treat?"TREATMENT REQUIRED":"MONITOR";$("#signoffRisk").textContent=pct(max)+"%";
  $("#routeList").innerHTML=routeRows.map(x=>'<div class="route-item"><div class="route-line"><span class="route-name">'+x.route_id+" · "+x.route+'</span><span class="decision '+x.decision+'">'+label(x.decision)+'</span></div><div class="route-meta">P'+x.priority+" · "+x.depot+" · ground "+fmt(x.forecast.soil_temperature_0cm)+"°C · "+(x.moisture?.possible?"moisture possible":"dry")+'</div><div class="riskbar"><i style="width:'+pct(x.risk)+'%"></i></div><div class="route-extra"><span>ML hazard '+pct(x.risk)+'%</span><span>'+ (x.departureAt?("leave "+time(x.departureAt)):"no departure")+'</span></div></div>').join("");
  $("#routeTable").innerHTML=routeRows.map(x=>'<tr><td>'+x.route_id+" · "+x.route+'</td><td><span class="pbadge">P"+x.priority+'</span></td><td class="'+(x.forecast.soil_temperature_0cm<=groundThresholdC(x.priority)?"temp-warn":"temp-good")+'">'+fmt(x.forecast.soil_temperature_0cm)+'°C</td><td>'+(x.moisture?.possible?"Possible":"Dry")+'</td><td><span class="risk '+(x.risk>.7?"high":x.risk>.35?"med":"low")+'">'+pct(x.risk)+'%</span></td><td><span class="decision '+x.decision+'">'+label(x.decision)+'</span></td><td>'+time(x.departureAt)+'</td></tr>').join("");
- const f=forecast[0]||{};const times=f.time||[], soil=f.soil_temperature_0cm||[];
- $("#airTemp").textContent=fmt(f.temperature_2m?.[0])+"°C";
- $("#groundTemp").textContent=fmt(f.soil_temperature_0cm?.[0])+"°C";
- $("#dewTemp").textContent=fmt(f.dew_point_2m?.[0])+"°C";
- $("#rainTemp").textContent=fmt(f.precipitation?.[0])+" mm";
- $("#freezeWindow").textContent=hoursBelow0(soil)+" h";
- $("#forecastStrip").innerHTML=Array.from({length:8},(_,h)=>{const s=soil[h],t=times[h];return '<div class="hour '+(s<=0?"cold":s<=1.5?"warn":"")+'"><div class="t">'+(t?new Intl.DateTimeFormat("en-IE",{hour:"2-digit"}).format(new Date(t)):"+"+h+"h")+'</div><div class="temp">'+fmt(s)+'°</div><div class="soil">ground</div></div>';}).join("");
+ renderWeather();
  const hs=summariseHistory(history),tot=validateHistoryChecks(history);$("#historyRows").textContent=tot.rows.toLocaleString();$("#historyRuns").textContent=tot.gritting_runs.toLocaleString();$("#historySalt").textContent=tot.salt_t.toFixed(1);
  const candidates=hs.map(x=>({x,score:(num(x.ice_incidents_untreated)-num(x.ice_incidents_treated))})).sort((a,b)=>b.score-a.score);
  const top=candidates[0]?.x;if(top){$("#reviewRoute").textContent=top.route_id+" · "+top.route;$("#reviewText").innerHTML='<strong>'+top.ice_incidents_untreated+'</strong> untreated-night ice incidents vs <strong>'+top.ice_incidents_treated+'</strong> treated-night incidents.';}
