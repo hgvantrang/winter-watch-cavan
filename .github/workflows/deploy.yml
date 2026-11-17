@@ -2,6 +2,8 @@ name: Deploy Winter Watch to GitHub Pages
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,14 +21,54 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Fetch current winter source data
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/live
+          curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 --max-time 45             "https://bdaib-hub.pages.dev/data/winter/tonight.csv" -o data/live/tonight.csv
+          curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 --max-time 45             "https://bdaib-hub.pages.dev/data/winter/routes.csv" -o data/live/routes.csv
+          curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 --max-time 60             "https://bdaib-hub.pages.dev/data/winter/history.csv" -o data/live/history.csv
+
+      - name: Fetch current 24h Open-Meteo forecast
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 3 --connect-timeout 15 --max-time 60             "https://api.open-meteo.com/v1/forecast?latitude=53.99,54.04,54.07,53.88,53.92,53.87,54.06,54.11,53.83,53.9&longitude=-7.345,-7.38,-7.44,-7.33,-6.98,-7.54,-7.09,-7.58,-7.08,-6.8&hourly=temperature_2m,soil_temperature_0cm,dew_point_2m,precipitation&forecast_hours=24&timezone=Europe%2FDublin"             -o data/live/forecast.json
+
+      - name: Validate downloaded source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s data/live/tonight.csv
+          test -s data/live/routes.csv
+          test -s data/live/history.csv
+          test -s data/live/forecast.json
+          python - <<'PY'
+          import csv, json
+          for p in ["data/live/tonight.csv","data/live/routes.csv","data/live/history.csv"]:
+              with open(p, newline="", encoding="utf-8") as f:
+                  rows=list(csv.DictReader(f))
+              assert rows, f"{p} is empty"
+              print(p, "rows:", len(rows))
+          with open("data/live/forecast.json", encoding="utf-8") as f:
+              x=json.load(f)
+          locs=x if isinstance(x,list) else [x]
+          assert locs and all("hourly" in z and z["hourly"].get("time") for z in locs)
+          print("forecast locations:", len(locs))
+          PY
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
           enablement: true
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v4
         with:
           path: .
+
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
