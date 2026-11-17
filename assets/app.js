@@ -48,12 +48,29 @@ function zeroTime(series,time){const i=series.findIndex(v=>num(v)<=0);return i<0
 function nearestForecast(i){return forecast[i]||{time:[],temperature_2m:[],soil_temperature_0cm:[],dew_point_2m:[],precipitation:[]};}
 
 async function fetchText(url,timeoutMs=12000){
- const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),timeoutMs);
- try{
-   const r=await fetch(url,{cache:"no-store",signal:controller.signal,mode:"cors"});
-   if(!r.ok) throw new Error(url+" "+r.status);
-   return await r.text();
- }finally{clearTimeout(timer);}
+ // GitHub Pages is a static origin. The assignment data host may not expose
+ // CORS headers, so try the source directly first and use a public GET-only
+ // CORS bridge only when the direct browser request is blocked.
+ const attempts = [url];
+ if(/^https?:\\/\\/bdaib-hub\\.pages\\.dev\\//.test(url) || /^https?:\\/\\/api\\.open-meteo\\.com\\//.test(url)){
+   attempts.push("https://proxy.cors.dev/"+url);
+ }
+ let lastError;
+ for(const target of attempts){
+   const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),timeoutMs);
+   try{
+     const r=await fetch(target,{cache:"no-store",signal:controller.signal,mode:"cors",credentials:"omit"});
+     if(!r.ok) throw new Error(target+" "+r.status);
+     const text=await r.text();
+     if(!text.trim()) throw new Error(target+" returned an empty response");
+     return text;
+   }catch(e){
+     lastError=e;
+   }finally{
+     clearTimeout(timer);
+   }
+ }
+ throw new Error("Could not load "+url+" in the browser. "+(lastError?.message||"network error"));
 }
 async function fetchJson(url,timeoutMs=12000){return JSON.parse(await fetchText(url,timeoutMs));}
 async function fetchFirst(localUrl,remoteUrl,timeoutMs=12000){
