@@ -41,15 +41,45 @@ function hoursBelow0(series){return series.filter(x=>num(x)<=0).length;}
 function zeroTime(series,time){const i=series.findIndex(v=>num(v)<=0);return i<0?null:new Date(time[i]);}
 function nearestForecast(i){return forecast[i]||{time:[],temperature_2m:[],soil_temperature_0cm:[],dew_point_2m:[],precipitation:[]};}
 
-async function fetchText(url){const r=await fetch(url,{cache:"no-store"});if(!r.ok)throw new Error(url+" "+r.status);return r.text();}
+async function fetchText(url,timeoutMs=12000){
+ const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),timeoutMs);
+ try{
+   const r=await fetch(url,{cache:"no-store",signal:controller.signal});
+   if(!r.ok) throw new Error(url+" "+r.status);
+   return await r.text();
+ }finally{clearTimeout(timer);}
+}
+async function fetchJson(url,timeoutMs=12000){return JSON.parse(await fetchText(url,timeoutMs));}
 async function load(){
- const [rt,dt,ht,ft]=await Promise.all([fetchText(SOURCES.routes),fetchText(SOURCES.tonight),fetchText(SOURCES.history),fetchText(SOURCES.forecast)]);
- routes=csvParse(rt);depots=csvParse(dt);history=csvParse(ht);
- const f=JSON.parse(ft);forecast=(Array.isArray(f)?f:[f]).map(x=>x.hourly);
- const check=validateHistoryChecks(history);
- $("#dataStatus").textContent="Live data connected";
+ const results=await Promise.allSettled([
+   fetchText(SOURCES.routes),
+   fetchText(SOURCES.tonight),
+   fetchText(SOURCES.history,20000),
+   fetchJson(SOURCES.forecast,12000)
+ ]);
+ const errors=[];
+ if(results[0].status==="fulfilled") routes=csvParse(results[0].value);
+ else errors.push("routes");
+ if(results[1].status==="fulfilled") depots=csvParse(results[1].value);
+ else errors.push("depot");
+ if(results[2].status==="fulfilled") history=csvParse(results[2].value);
+ else errors.push("history");
+ if(results[3].status==="fulfilled"){
+   const f=results[3].value; forecast=(Array.isArray(f)?f:[f]).map(x=>x.hourly||x);
+ }else errors.push("forecast");
+ if(!routes.length){
+   try{
+     routes=csvParse(await fetchText("data/priority-routes.csv"));
+   }catch(e){}
+ }
+ const connected=results.filter(x=>x.status==="fulfilled").length;
+ $("#dataStatus").textContent=connected===4?"Live data connected":connected>0?"Live data partial":"Data unavailable";
  $("#refreshTime").textContent=new Intl.DateTimeFormat("en-IE",{hour:"2-digit",minute:"2-digit"}).format(new Date());
- return check;
+ if(errors.length){
+   const labels={routes:"route network",depot:"depot data",history:"historical data",forecast:"forecast"};
+   $("#networkReason").textContent="Live data loaded where available. Unavailable source: "+errors.map(x=>labels[x]).join(", ")+".";
+ }
+ return {rows:history.length,errors};
 }
 function findDepot(route){const name=depotOf(route);return depots.find(d=>clean(get(d,"depot","depot_id","name"))===name)||depots.find(d=>clean(get(d,"depot","depot_id","name")).toLowerCase()===name.toLowerCase())||depots[0]||{};}
 function buildRows(){
@@ -64,6 +94,15 @@ function buildRows(){
 function render(){
  buildRows();
  const treat=routeRows.filter(x=>x.decision==="TREAT").length,flag=routeRows.filter(x=>x.decision==="FLAG").length,max=Math.max(...routeRows.map(x=>x.risk),0);
+ if(!routeRows.length){
+   $("#networkDecision").textContent="DATA CHECK";
+   $("#networkReason").textContent="No route records are currently available. The engineer should not use this page for an operational call.";
+   $("#routeList").innerHTML='<div class="empty-state"><div class="empty-icon">!</div><b>Waiting for route data</b><span>Source data could not be loaded safely. No placeholder operational decision is shown.</span></div>';
+   $("#routeTable").innerHTML='<tr><td colspan="7">Route data unavailable — no operational decision issued.</td></tr>';
+   $("#treatCount").textContent="—";$("#flagCount").textContent="—";$("#maxRisk").textContent="—";
+   $("#signoffDecision").textContent="NO DECISION";$("#signoffRisk").textContent="—";
+   return;
+ }
  $("#treatCount").textContent=treat;$("#flagCount").textContent=flag;$("#maxRisk").textContent=pct(max)+"%";
  $("#networkDecision").textContent=treat?"TREATMENT REQUIRED":"MONITOR";
  $("#networkReason").textContent=treat?treat+" route(s) pass the plan's temperature/moisture gate. Stock, truck readiness and timing are shown per route.":"No route currently passes the plan's temperature/moisture gate.";
