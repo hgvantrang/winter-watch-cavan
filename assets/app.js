@@ -44,41 +44,64 @@ function nearestForecast(i){return forecast[i]||{time:[],temperature_2m:[],soil_
 async function fetchText(url,timeoutMs=12000){
  const controller=new AbortController(), timer=setTimeout(()=>controller.abort(),timeoutMs);
  try{
-   const r=await fetch(url,{cache:"no-store",signal:controller.signal});
+   const r=await fetch(url,{cache:"no-store",signal:controller.signal,mode:"cors"});
    if(!r.ok) throw new Error(url+" "+r.status);
    return await r.text();
  }finally{clearTimeout(timer);}
 }
 async function fetchJson(url,timeoutMs=12000){return JSON.parse(await fetchText(url,timeoutMs));}
+
+const COORDS=[
+ [53.99,-7.345],[54.04,-7.38],[54.07,-7.44],[53.88,-7.33],[53.92,-6.98],
+ [53.87,-7.54],[54.06,-7.09],[54.11,-7.58],[53.83,-7.08],[53.9,-6.8]
+];
+async function loadForecast(){
+ const url=SOURCES.forecast;
+ try{
+   const f=await fetchJson(url,14000);
+   const arr=Array.isArray(f)?f:[f];
+   if(arr.length && arr.some(x=>x.hourly)) return arr.map(x=>x.hourly||x);
+ }catch(e){}
+ // Same Open-Meteo source, one coordinate per request as a resilient fallback.
+ const qs=COORDS.map(([lat,lon])=>fetchJson(
+   "https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lon+
+   "&hourly=temperature_2m,soil_temperature_0cm,dew_point_2m,precipitation&forecast_hours=24&timezone=Europe%2FDublin",9000
+ ).then(x=>x.hourly||x));
+ return await Promise.all(qs);
+}
 async function load(){
- const results=await Promise.allSettled([
-   fetchText(SOURCES.routes),
-   fetchText(SOURCES.tonight),
-   fetchText(SOURCES.history,20000),
-   fetchJson(SOURCES.forecast,12000)
- ]);
+ routes=[];depots=[];history=[];forecast=[];
  const errors=[];
- if(results[0].status==="fulfilled") routes=csvParse(results[0].value);
- else errors.push("routes");
- if(results[1].status==="fulfilled") depots=csvParse(results[1].value);
- else errors.push("depot");
- if(results[2].status==="fulfilled") history=csvParse(results[2].value);
- else errors.push("history");
- if(results[3].status==="fulfilled"){
-   const f=results[3].value; forecast=(Array.isArray(f)?f:[f]).map(x=>x.hourly||x);
- }else errors.push("forecast");
+ const status=(msg)=>{const el=$("#dataStatus");if(el)el.textContent=msg;};
+ status("Loading live weather…");
+
+ const routeP=fetchText(SOURCES.routes).then(t=>{routes=csvParse(t);return"routes";}).catch(()=>{errors.push("routes");return"routes";});
+ const depotP=fetchText(SOURCES.tonight).then(t=>{depots=csvParse(t);return"depot";}).catch(()=>{errors.push("depot");return"depot";});
+ const historyP=fetchText(SOURCES.history,20000).then(t=>{history=csvParse(t);return"history";}).catch(()=>{errors.push("history");return"history";});
+ const forecastP=loadForecast().then(f=>{
+   forecast=f;
+   status("Live weather connected");
+   return"forecast";
+ }).catch(()=>{
+   errors.push("forecast");
+   status("Weather feed unavailable");
+   return"forecast";
+ });
+ await Promise.all([routeP,depotP,forecastP]);
  if(!routes.length){
-   try{
-     routes=csvParse(await fetchText("data/priority-routes.csv"));
-   }catch(e){}
+   try{routes=csvParse(await fetchText("data/priority-routes.csv"));}catch(e){}
  }
- const connected=results.filter(x=>x.status==="fulfilled").length;
- $("#dataStatus").textContent=connected===4?"Live data connected":connected>0?"Live data partial":"Data unavailable";
+ const connected=[routes.length,depots.length,forecast.length].filter(Boolean).length;
+ status(forecast.length ? (connected===3?"Live data connected":"Live weather connected · other data partial") : "Data unavailable");
  $("#refreshTime").textContent=new Intl.DateTimeFormat("en-IE",{hour:"2-digit",minute:"2-digit"}).format(new Date());
+ render();
+ // History is non-blocking: it enriches the evidence panel without delaying tonight's weather decision.
+ await historyP;
  if(errors.length){
    const labels={routes:"route network",depot:"depot data",history:"historical data",forecast:"forecast"};
    $("#networkReason").textContent="Live data loaded where available. Unavailable source: "+errors.map(x=>labels[x]).join(", ")+".";
  }
+ render();
  return {rows:history.length,errors};
 }
 function findDepot(route){const name=depotOf(route);return depots.find(d=>clean(get(d,"depot","depot_id","name"))===name)||depots.find(d=>clean(get(d,"depot","depot_id","name")).toLowerCase()===name.toLowerCase())||depots[0]||{};}
@@ -117,7 +140,17 @@ function render(){
 }
 function label(d){return d==="DONT_TREAT"?"DON'T TREAT":d.replaceAll("_"," ");}
 function time(v){if(!v)return"—";return new Intl.DateTimeFormat("en-IE",{hour:"2-digit",minute:"2-digit"}).format(new Date(v));}
-function initMap(){map=L.map("map",{zoomControl:false}).setView([53.96,-7.28],9);L.control.zoom({position:"bottomright"}).addTo(map);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"© OpenStreetMap"}).addTo(map);routeRows.forEach((x,i)=>{const c=[[53.99,-7.345],[54.04,-7.38],[54.07,-7.44],[53.88,-7.33],[53.92,-6.98],[53.87,-7.54],[54.06,-7.09],[54.11,-7.58],[53.83,-7.08],[53.9,-6.8]][i];if(!c)return;const color=x.decision==="TREAT"?"#2e9b68":x.decision==="FLAG"?"#c4544d":"#d39e43";L.circleMarker(c,{radius:8,weight:3,color,fillColor:color,fillOpacity:.8}).addTo(map).bindPopup("<b>"+x.route_id+" · "+x.route+"</b><br>Priority P"+x.priority+"<br>Ground "+fmt(x.forecast.soil_temperature_0cm)+"°C<br>Model risk "+pct(x.risk)+"%<br><b>"+label(x.decision)+"</b>");});}
+function initMap(){
+ map=L.map("map",{zoomControl:false}).setView([53.96,-7.28],9);
+ L.control.zoom({position:"bottomright"}).addTo(map);
+ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:18,attribution:"© OpenStreetMap"}).addTo(map);
+ routeRows.forEach((x,i)=>{
+   const c=COORDS[i];if(!c)return;
+   const color=x.decision==="TREAT"?"#2e9b68":x.decision==="FLAG"?"#c4544d":"#d39e43";
+   L.circleMarker(c,{radius:9,weight:3,color,fillColor:color,fillOpacity:.82}).addTo(map)
+    .bindPopup("<b>"+x.route_id+" · "+x.route+"</b><br>Priority P"+x.priority+"<br>Ground "+fmt(x.forecast.soil_temperature_0cm)+"°C<br>Model risk "+pct(x.risk)+"%<br><b>"+label(x.decision)+"</b>");
+ });
+}
 function wire(){
  const now=new Date();$("#dateLabel").textContent=new Intl.DateTimeFormat("en-IE",{weekday:"long",day:"numeric",month:"long"}).format(now).toUpperCase();const tick=()=>$("#clock").textContent=new Intl.DateTimeFormat("en-IE",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false,timeZone:"Europe/Dublin"}).format(new Date());tick();setInterval(tick,1000);
  $$("[data-filter]").forEach(b=>b.addEventListener("click",()=>{$$("[data-filter]").forEach(x=>x.classList.remove("active"));b.classList.add("active");const f=b.dataset.filter;$("#routeTable").querySelectorAll("tr").forEach((tr,i)=>tr.style.display=f==="all"||routeRows[i].decision===f?"":"none");}));
