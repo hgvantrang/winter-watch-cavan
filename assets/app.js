@@ -56,18 +56,20 @@ const COORDS=[
  [53.87,-7.54],[54.06,-7.09],[54.11,-7.58],[53.83,-7.08],[53.9,-6.8]
 ];
 async function loadForecast(){
- const url=SOURCES.forecast;
- try{
-   const f=await fetchJson(url,14000);
-   const arr=Array.isArray(f)?f:[f];
-   if(arr.length && arr.some(x=>x.hourly)) return arr.map(x=>x.hourly||x);
- }catch(e){}
- // Same Open-Meteo source, one coordinate per request as a resilient fallback.
- const qs=COORDS.map(([lat,lon])=>fetchJson(
-   "https://api.open-meteo.com/v1/forecast?latitude="+lat+"&longitude="+lon+
-   "&hourly=temperature_2m,soil_temperature_0cm,dew_point_2m,precipitation&forecast_hours=24&timezone=Europe%2FDublin",9000
- ).then(x=>x.hourly||x));
- return await Promise.all(qs);
+ // Open-Meteo supports multi-location responses, but the public dashboard
+ // uses one request per coordinate as the most reliable browser path.
+ const requests=COORDS.map(([lat,lon])=>{
+   const url="https://api.open-meteo.com/v1/forecast?"+
+     "latitude="+encodeURIComponent(lat)+
+     "&longitude="+encodeURIComponent(lon)+
+     "&hourly=temperature_2m%2Csoil_temperature_0cm%2Cdew_point_2m%2Cprecipitation"+
+     "&forecast_hours=24&timezone=Europe%2FDublin";
+   return fetchJson(url,12000).then(x=>{
+     if(!x || !x.hourly || !Array.isArray(x.hourly.time)) throw new Error("Invalid Open-Meteo response");
+     return x.hourly;
+   });
+ });
+ return await Promise.all(requests);
 }
 async function load(){
  routes=[];depots=[];history=[];forecast=[];
